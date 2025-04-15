@@ -20,6 +20,7 @@ using NinjaTrader.NinjaScript;
 using NinjaTrader.Core.FloatingPoint;
 using NinjaTrader.NinjaScript.DrawingTools;
 using System.IO;
+using NinjaTrader.NinjaScript.Utilities;
 #endregion
 
 //This namespace holds Indicators in this folder and is required. Do not change it. 
@@ -27,7 +28,7 @@ namespace NinjaTrader.NinjaScript.Indicators
 {
 	public class TR5taEntradaSignal : Indicator
 	{
-        private string path;
+        private string _Path;
         private StreamWriter sw; // a variable for the StreamWriter that will be used 
 
         private bool _initialized = false;
@@ -47,13 +48,14 @@ namespace NinjaTrader.NinjaScript.Indicators
         private int BarsRequiredToTrade = 20;
 
         bool PreviousGuiaArriba = false;
-
-        private void WriteToFile(string text)
+        private void PrintOutput(bool Verbose, string text)
         {
-            sw = File.AppendText(path);  // Open the path for writing
-            sw.WriteLine(text); // Append a new line to the file
-            sw.Close(); // Close the file to allow future calls to access the file again.
+            if (Verbose)
+            {
+                Print(text);
+            }
         }
+
         protected override void OnStateChange()
 		{
 			if (State == State.SetDefaults)
@@ -72,7 +74,8 @@ namespace NinjaTrader.NinjaScript.Indicators
 				//See Help Guide for additional information.
 				IsSuspendedWhileInactive					= true;
                 IsWriteToFile = false;
-                
+                IsVerboseLogs = false;
+
             }
             else if (State == State.Configure)
             {
@@ -92,12 +95,12 @@ namespace NinjaTrader.NinjaScript.Indicators
             }
             else if (State == State.Terminated)
             {
-                if (sw != null)
-                {
-                    sw.Close();
-                    sw.Dispose();
-                    sw = null;
-                }
+                //if (sw != null)
+                //{
+                //    sw.Close();
+                //    sw.Dispose();
+                //    sw = null;
+                //}
             }
         }
 
@@ -108,8 +111,8 @@ namespace NinjaTrader.NinjaScript.Indicators
                 if (IsWriteToFile)
                 {
                     FileName = FileNamePrefix + DateTime.Now.Ticks.ToString() + ".csv";
-                    path = NinjaTrader.Core.Globals.UserDataDir + FileName; // Define the Path to our test file
-                    WriteToFile(HeaderText);
+                    _Path = NinjaTrader.Core.Globals.UserDataDir + FileName; // Define the Path to our test file
+                    TRUtilities.SaveToFile(_Path, IsVerboseLogs, HeaderText);
                 }
 
             }
@@ -177,28 +180,31 @@ namespace NinjaTrader.NinjaScript.Indicators
 
             if (BarsInProgress == 0)
             {
-
+                string entradamessage = "";
                 if (Is5taEntradaAlcista || Is5taEntradaBajista)
                 {
                     if (Is5taEntradaAlcista)
                     {
+                        entradamessage = string.Format("{0}, 5ta Entrada Alcista", Time[0]);
+                        TRUtilities.SaveToFile(_Path, IsWriteToFile, entradamessage);
+                        PrintOutput(true, entradamessage);
+
                         _ = Draw.Dot(this, @"SectorTR" + CurrentBar, true, 0, Lows[1][0] , Brushes.CornflowerBlue);
                         Draw.Text(this, "tag1" + CurrentBar, "5ta Entrada Alcista", 0, Convert.ToInt32(Lows[1][0]) - 10, ChartControl.Properties.ChartText);
                     }
                     else
                     {
+                        entradamessage = string.Format("{0}, 5ta Entrada Alcista", Time[0]);
+                        TRUtilities.SaveToFile(_Path, IsWriteToFile, entradamessage);
+                        PrintOutput(true, entradamessage);
+
                         _ = Draw.Dot(this, @"SectorTR" + CurrentBar, true, 0, Highs[1][0] , Brushes.CornflowerBlue);
                         Draw.Text(this, "tag1" + CurrentBar, "5ta Entrada Bajista", 0, Convert.ToInt32(Highs[1][0]) + 10, ChartControl.Properties.ChartText);
                     }
 
-
                     string logEntry = string.Format("{0},{1},{2},{3},{4},{5},{6},{7},{8},{9},{10},{11},{12},{13},{14},{15},{16},{17},{18},{19},{20},{21},{22}", Time[0], BarsInProgress, Open[0], Close[0], High[0], Low[0], GuiaTR1[0], GuiaArriba, IsCambioDeGuia,atr[0], IsHighGTGuia, IsLowCrossGuia, IsFacturoGuia, IsFacturoLTGuia, sma[0], ema2[0], ema15[0], IsCloseGTSMA50Alcista, IsEma2Rising, IsEma15Rising, IsCloseGTEma2min, Is5taEntradaAlcista, Is5taEntradaBajista);
-                    Print(logEntry);
-
-                    if (IsWriteToFile)
-                    {
-                        WriteToFile(logEntry);
-                    }
+                    PrintOutput(IsVerboseLogs, entradamessage);
+                    TRUtilities.SaveToFile(_Path, (IsWriteToFile && IsVerboseLogs), logEntry);
                 }
             }
 
@@ -209,7 +215,10 @@ namespace NinjaTrader.NinjaScript.Indicators
         public bool IsWriteToFile
         { get; set; }
 
-      
+        [NinjaScriptProperty]
+        [Display(Name = "IsVerboseLogs", Description = "Verbose log details", Order = 2, GroupName = "Parameters")]
+        public bool IsVerboseLogs
+        { get; set; }
         #endregion
     }
 }
@@ -221,18 +230,18 @@ namespace NinjaTrader.NinjaScript.Indicators
 	public partial class Indicator : NinjaTrader.Gui.NinjaScript.IndicatorRenderBase
 	{
 		private TR5taEntradaSignal[] cacheTR5taEntradaSignal;
-		public TR5taEntradaSignal TR5taEntradaSignal(bool isWriteToFile)
+		public TR5taEntradaSignal TR5taEntradaSignal(bool isWriteToFile, bool isVerboseLogs)
 		{
-			return TR5taEntradaSignal(Input, isWriteToFile);
+			return TR5taEntradaSignal(Input, isWriteToFile, isVerboseLogs);
 		}
 
-		public TR5taEntradaSignal TR5taEntradaSignal(ISeries<double> input, bool isWriteToFile)
+		public TR5taEntradaSignal TR5taEntradaSignal(ISeries<double> input, bool isWriteToFile, bool isVerboseLogs)
 		{
 			if (cacheTR5taEntradaSignal != null)
 				for (int idx = 0; idx < cacheTR5taEntradaSignal.Length; idx++)
-					if (cacheTR5taEntradaSignal[idx] != null && cacheTR5taEntradaSignal[idx].IsWriteToFile == isWriteToFile && cacheTR5taEntradaSignal[idx].EqualsInput(input))
+					if (cacheTR5taEntradaSignal[idx] != null && cacheTR5taEntradaSignal[idx].IsWriteToFile == isWriteToFile && cacheTR5taEntradaSignal[idx].IsVerboseLogs == isVerboseLogs && cacheTR5taEntradaSignal[idx].EqualsInput(input))
 						return cacheTR5taEntradaSignal[idx];
-			return CacheIndicator<TR5taEntradaSignal>(new TR5taEntradaSignal(){ IsWriteToFile = isWriteToFile }, input, ref cacheTR5taEntradaSignal);
+			return CacheIndicator<TR5taEntradaSignal>(new TR5taEntradaSignal(){ IsWriteToFile = isWriteToFile, IsVerboseLogs = isVerboseLogs }, input, ref cacheTR5taEntradaSignal);
 		}
 	}
 }
@@ -241,14 +250,14 @@ namespace NinjaTrader.NinjaScript.MarketAnalyzerColumns
 {
 	public partial class MarketAnalyzerColumn : MarketAnalyzerColumnBase
 	{
-		public Indicators.TR5taEntradaSignal TR5taEntradaSignal(bool isWriteToFile)
+		public Indicators.TR5taEntradaSignal TR5taEntradaSignal(bool isWriteToFile, bool isVerboseLogs)
 		{
-			return indicator.TR5taEntradaSignal(Input, isWriteToFile);
+			return indicator.TR5taEntradaSignal(Input, isWriteToFile, isVerboseLogs);
 		}
 
-		public Indicators.TR5taEntradaSignal TR5taEntradaSignal(ISeries<double> input , bool isWriteToFile)
+		public Indicators.TR5taEntradaSignal TR5taEntradaSignal(ISeries<double> input , bool isWriteToFile, bool isVerboseLogs)
 		{
-			return indicator.TR5taEntradaSignal(input, isWriteToFile);
+			return indicator.TR5taEntradaSignal(input, isWriteToFile, isVerboseLogs);
 		}
 	}
 }
@@ -257,14 +266,14 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
 	public partial class Strategy : NinjaTrader.Gui.NinjaScript.StrategyRenderBase
 	{
-		public Indicators.TR5taEntradaSignal TR5taEntradaSignal(bool isWriteToFile)
+		public Indicators.TR5taEntradaSignal TR5taEntradaSignal(bool isWriteToFile, bool isVerboseLogs)
 		{
-			return indicator.TR5taEntradaSignal(Input, isWriteToFile);
+			return indicator.TR5taEntradaSignal(Input, isWriteToFile, isVerboseLogs);
 		}
 
-		public Indicators.TR5taEntradaSignal TR5taEntradaSignal(ISeries<double> input , bool isWriteToFile)
+		public Indicators.TR5taEntradaSignal TR5taEntradaSignal(ISeries<double> input , bool isWriteToFile, bool isVerboseLogs)
 		{
-			return indicator.TR5taEntradaSignal(input, isWriteToFile);
+			return indicator.TR5taEntradaSignal(input, isWriteToFile, isVerboseLogs);
 		}
 	}
 }

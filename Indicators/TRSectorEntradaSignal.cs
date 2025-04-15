@@ -19,7 +19,8 @@ using NinjaTrader.Data;
 using NinjaTrader.NinjaScript;
 using NinjaTrader.Core.FloatingPoint;
 using NinjaTrader.NinjaScript.DrawingTools;
-using System.IO;
+
+using NinjaTrader.NinjaScript.Utilities;
 #endregion
 
 //This namespace holds Indicators in this folder and is required. Do not change it. 
@@ -27,8 +28,8 @@ namespace NinjaTrader.NinjaScript.Indicators
 {
 	public class TRSectorEntradaSignal : Indicator
 	{
-        private string path;
-        private StreamWriter sw; // a variable for the StreamWriter that will be used 
+        private string _Path;
+        
 
         private bool _initialized = false;
         bool GuiaArriba = false;
@@ -41,17 +42,20 @@ namespace NinjaTrader.NinjaScript.Indicators
         private string FileNamePrefix = "Sector";
         private string FileName = "";
         private string HeaderText = "Time, BarInProgress,Open,Close,High,Low,Guia,GuiaArriba,IsHighGTGuia, IsLowCrossGuia,IsFacturoGuia, IsFacturoLTGuia,sma50, ema2, ema15,IsCloseGTSMA50, IsEma2Rising,IsEma15Rising, IsCloseGTema2,IsSectorAlcista,IsSectorBajista";
+        private string BodyText = "{0},{1},{2},{3},{4},{5},{6},{7},{8},{9},{10},{11},{12},{13},{14},{15},{16},{17},{18},{19},{20}";
 
         private int BarsRequiredToTrade = 20;
 
-        private void WriteToFile(string text)
-		{
-            sw = File.AppendText(path);  // Open the path for writing
-            sw.WriteLine(text); // Append a new line to the file
-            sw.Close(); // Close the file to allow future calls to access the file again.
 
-
+        private void PrintOutput(bool Verbose, string text)
+        {
+            if (Verbose)
+            {
+                Print(text);
+            }
         }
+
+       
         protected override void OnStateChange()
 		{
 			if (State == State.SetDefaults)
@@ -70,17 +74,14 @@ namespace NinjaTrader.NinjaScript.Indicators
 				//See Help Guide for additional information.
 				IsSuspendedWhileInactive					= true;
 				IsWriteToFile					= false;
-               
-
+                IsVerboseLogs = false;
 
                 //AddPlot(new Stroke(Brushes.LimeGreen, 2), PlotStyle.Dot, "SectorEntryPlot");
             }
 			else if (State == State.Configure)
 			{
                 AddDataSeries(Data.BarsPeriodType.Minute, 5);
-                AddDataSeries(Data.BarsPeriodType.Minute, 15);
-
-                
+                AddDataSeries(Data.BarsPeriodType.Minute, 15);                
 
             }
             else if (State == State.DataLoaded)
@@ -98,12 +99,12 @@ namespace NinjaTrader.NinjaScript.Indicators
             }
             else if (State == State.Terminated)
             {
-                if (sw != null)
-                {
-                    sw.Close();
-                    sw.Dispose();
-                    sw = null;
-                }
+                //if (sw != null)
+                //{
+                //    sw.Close();
+                //    sw.Dispose();
+                //    sw = null;
+                //}
             }
         }
 
@@ -114,11 +115,9 @@ namespace NinjaTrader.NinjaScript.Indicators
                 if (IsWriteToFile)
                 {
                     FileName = FileNamePrefix + DateTime.Now.Ticks.ToString() + ".csv";
-                    path = NinjaTrader.Core.Globals.UserDataDir + FileName; // Define the Path to our test file
-                    WriteToFile(HeaderText);
-
+                    _Path = NinjaTrader.Core.Globals.UserDataDir + FileName; // Define the Path to our test file
+                    TRUtilities.SaveToFile(_Path, IsWriteToFile, HeaderText);
                 }
-
             }
 
             //Make sure Daily bars are greater than BarsRequiredToTrade
@@ -159,7 +158,6 @@ namespace NinjaTrader.NinjaScript.Indicators
             if (!GuiaArriba && IsEma2Rising && !IsEma15Rising && IsCloseGTSMA50Alcista)
             {
                 IsSectorAlcista = true;
-
             }
 
             if (GuiaArriba && !IsEma2Rising && IsEma15Rising && IsCloseGTSMA50Bajista)
@@ -171,24 +169,32 @@ namespace NinjaTrader.NinjaScript.Indicators
             {
                 if (IsSectorAlcista || IsSectorBajista)
                 {
-                    if(IsSectorAlcista)
+                    string entradamessage = "";
+                    if (IsSectorAlcista)
                     {
+                        entradamessage = string.Format("{0}, Sector Alcista", Time[0]);
+                        TRUtilities.SaveToFile(_Path, IsWriteToFile, entradamessage);
+                        PrintOutput(true, entradamessage);
+
                         _ = Draw.Dot(this, @"SectorTR" + CurrentBar, true, 0, Low[0] - 1, Brushes.CornflowerBlue);
                         Draw.Text(this, "tag1" + CurrentBar, "Sector Alcista", 0, Convert.ToInt32(Low[0]) - 10, ChartControl.Properties.ChartText);
+
+                        
                     }
                     else
                     {
+                        entradamessage = string.Format("{0}, Sector Bajista", Time[0]);
+                        TRUtilities.SaveToFile(_Path, IsWriteToFile, entradamessage);
+                        PrintOutput(true, entradamessage);
+
+                        
                         _ = Draw.Dot(this, @"SectorTR" + CurrentBar, true, 0, High[0] + 1, Brushes.CornflowerBlue);
                         Draw.Text(this, "tag1" + CurrentBar, "Sector Bajista", 0, Convert.ToInt32(High[0]) + 10, ChartControl.Properties.ChartText);
                     }
 
-                    string logEntry = string.Format("{0},{1},{2},{3},{4},{5},{6},{7},{8},{9},{10},{11},{12},{13},{14},{15},{16},{17},{18},{19},{20}", Time[0], BarsInProgress, Open[0], Close[0], High[0], Low[0], GuiaTR1[0], GuiaArriba, IsHighGTGuia, IsLowCrossGuia, IsFacturoGuia, IsFacturoLTGuia, sma[0], ema2[0], ema15[0], IsCloseGTSMA50Alcista, IsEma2Rising, IsEma15Rising, IsCloseGTEma2min, IsSectorAlcista, IsSectorBajista);
-                    Print(logEntry);
-
-                    if (IsWriteToFile)
-                    {                       
-                        WriteToFile(logEntry);                       
-                    }
+                    string logEntry = string.Format(BodyText, Time[0], BarsInProgress, Open[0], Close[0], High[0], Low[0], GuiaTR1[0], GuiaArriba, IsHighGTGuia, IsLowCrossGuia, IsFacturoGuia, IsFacturoLTGuia, sma[0], ema2[0], ema15[0], IsCloseGTSMA50Alcista, IsEma2Rising, IsEma15Rising, IsCloseGTEma2min, IsSectorAlcista, IsSectorBajista);
+                    TRUtilities.SaveToFile(_Path, (IsWriteToFile && IsVerboseLogs), logEntry);
+                    
                 }
             }
         }
@@ -199,7 +205,13 @@ namespace NinjaTrader.NinjaScript.Indicators
 		public bool IsWriteToFile
 		{ get; set; }
 
-		[Browsable(false)]
+        [NinjaScriptProperty]
+        [Display(Name = "IsVerboseLogs", Description = "Verbose log details", Order = 2, GroupName = "Parameters")]
+        public bool IsVerboseLogs
+        { get; set; }
+
+
+        [Browsable(false)]
 		[XmlIgnore]
 		public Series<double> SectorEntryPlot
 		{
@@ -217,18 +229,18 @@ namespace NinjaTrader.NinjaScript.Indicators
 	public partial class Indicator : NinjaTrader.Gui.NinjaScript.IndicatorRenderBase
 	{
 		private TRSectorEntradaSignal[] cacheTRSectorEntradaSignal;
-		public TRSectorEntradaSignal TRSectorEntradaSignal(bool isWriteToFile)
+		public TRSectorEntradaSignal TRSectorEntradaSignal(bool isWriteToFile, bool isVerboseLogs)
 		{
-			return TRSectorEntradaSignal(Input, isWriteToFile);
+			return TRSectorEntradaSignal(Input, isWriteToFile, isVerboseLogs);
 		}
 
-		public TRSectorEntradaSignal TRSectorEntradaSignal(ISeries<double> input, bool isWriteToFile)
+		public TRSectorEntradaSignal TRSectorEntradaSignal(ISeries<double> input, bool isWriteToFile, bool isVerboseLogs)
 		{
 			if (cacheTRSectorEntradaSignal != null)
 				for (int idx = 0; idx < cacheTRSectorEntradaSignal.Length; idx++)
-					if (cacheTRSectorEntradaSignal[idx] != null && cacheTRSectorEntradaSignal[idx].IsWriteToFile == isWriteToFile && cacheTRSectorEntradaSignal[idx].EqualsInput(input))
+					if (cacheTRSectorEntradaSignal[idx] != null && cacheTRSectorEntradaSignal[idx].IsWriteToFile == isWriteToFile && cacheTRSectorEntradaSignal[idx].IsVerboseLogs == isVerboseLogs && cacheTRSectorEntradaSignal[idx].EqualsInput(input))
 						return cacheTRSectorEntradaSignal[idx];
-			return CacheIndicator<TRSectorEntradaSignal>(new TRSectorEntradaSignal(){ IsWriteToFile = isWriteToFile }, input, ref cacheTRSectorEntradaSignal);
+			return CacheIndicator<TRSectorEntradaSignal>(new TRSectorEntradaSignal(){ IsWriteToFile = isWriteToFile, IsVerboseLogs = isVerboseLogs }, input, ref cacheTRSectorEntradaSignal);
 		}
 	}
 }
@@ -237,14 +249,14 @@ namespace NinjaTrader.NinjaScript.MarketAnalyzerColumns
 {
 	public partial class MarketAnalyzerColumn : MarketAnalyzerColumnBase
 	{
-		public Indicators.TRSectorEntradaSignal TRSectorEntradaSignal(bool isWriteToFile)
+		public Indicators.TRSectorEntradaSignal TRSectorEntradaSignal(bool isWriteToFile, bool isVerboseLogs)
 		{
-			return indicator.TRSectorEntradaSignal(Input, isWriteToFile);
+			return indicator.TRSectorEntradaSignal(Input, isWriteToFile, isVerboseLogs);
 		}
 
-		public Indicators.TRSectorEntradaSignal TRSectorEntradaSignal(ISeries<double> input , bool isWriteToFile)
+		public Indicators.TRSectorEntradaSignal TRSectorEntradaSignal(ISeries<double> input , bool isWriteToFile, bool isVerboseLogs)
 		{
-			return indicator.TRSectorEntradaSignal(input, isWriteToFile);
+			return indicator.TRSectorEntradaSignal(input, isWriteToFile, isVerboseLogs);
 		}
 	}
 }
@@ -253,14 +265,14 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
 	public partial class Strategy : NinjaTrader.Gui.NinjaScript.StrategyRenderBase
 	{
-		public Indicators.TRSectorEntradaSignal TRSectorEntradaSignal(bool isWriteToFile)
+		public Indicators.TRSectorEntradaSignal TRSectorEntradaSignal(bool isWriteToFile, bool isVerboseLogs)
 		{
-			return indicator.TRSectorEntradaSignal(Input, isWriteToFile);
+			return indicator.TRSectorEntradaSignal(Input, isWriteToFile, isVerboseLogs);
 		}
 
-		public Indicators.TRSectorEntradaSignal TRSectorEntradaSignal(ISeries<double> input , bool isWriteToFile)
+		public Indicators.TRSectorEntradaSignal TRSectorEntradaSignal(ISeries<double> input , bool isWriteToFile, bool isVerboseLogs)
 		{
-			return indicator.TRSectorEntradaSignal(input, isWriteToFile);
+			return indicator.TRSectorEntradaSignal(input, isWriteToFile, isVerboseLogs);
 		}
 	}
 }
