@@ -32,7 +32,7 @@ namespace NinjaTrader.NinjaScript.Indicators
         private StreamWriter sw; // a variable for the StreamWriter that will be used 
 
         private bool _initialized = false;
-        bool GuiaArriba = false;
+       
         private DireccionTR DireccionTR2Min;
         private DireccionTR DireccionTR12Min;
         private GuiaTR GuiaTR1;
@@ -47,7 +47,21 @@ namespace NinjaTrader.NinjaScript.Indicators
 
         private int BarsRequiredToTrade = 20;
 
-        bool PreviousGuiaArriba = false;
+        private TRProperties trProp = new TRProperties();
+
+        //bool PreviousGuiaArriba = false;
+        //bool IsCambioDeGuia = false;
+        //bool IsHighGTGuia = false;
+        //bool IsLowCrossGuia = false;
+        //bool IsFacturoGuia = false;
+        //bool IsFacturoLTGuia = false;
+        //bool IsCloseGTSMA50Alcista = false;
+        //bool IsCloseGTSMA50Bajista = false;
+        //bool IsEma2Rising = false;
+        //bool IsEma15Rising = false;
+        //bool IsCloseGTEma2min = false;
+        //bool IsEma2OverEma15 = false;
+
         private void PrintOutput(bool Verbose, string text)
         {
             if (Verbose)
@@ -95,16 +109,81 @@ namespace NinjaTrader.NinjaScript.Indicators
             }
             else if (State == State.Terminated)
             {
-                //if (sw != null)
-                //{
-                //    sw.Close();
-                //    sw.Dispose();
-                //    sw = null;
-                //}
+               
+            }
+        }
+        private void Calculate5taEntradaSignals()
+        {
+
+
+             trProp.IsHighGTGuia = GuiaTR1[0] < High[0];
+             trProp.IsLowCrossGuia = GuiaTR1[0] > Low[0];
+             trProp.IsFacturoGuia = Close[0] > GuiaTR1[0];
+             trProp.IsFacturoLTGuia = Close[0] < GuiaTR1[0];
+
+             trProp.IsCloseGTSMA50Alcista = (Close[0] > sma[0] && Open[0] < sma[0]) ? true : false;
+             trProp.IsCloseGTSMA50Bajista = (Close[0] < sma[0] && Open[0] > sma[0]) ? true : false;
+             trProp.IsEma2Rising = (ema2[0] > ema2[1]) ? true : false;
+             trProp.IsEma15Rising = (ema15[0] > ema15[1]) ? true : false;
+             trProp.IsCloseGTEma2min = (Close[0] > ema2[0]) ? true : false;
+            trProp.IsEma2OverEma15 = (ema2[0] > ema15[0]) ? true : false;
+
+            trProp.IsCambioDeGuia = (trProp.PreviousGuiaArriba != trProp.GuiaArriba) ? true : false;
+            
+
+            //double changeofGuiaValue = Math.Abs(GuiaTR1[0] - GuiaTR1[1]);
+            //if (changeofGuiaValue > atr[0] && GuiaArriba != PreviousGuiaArriba)
+            //{
+            //    //    IsCambioDeGuia = true;
+            //}
+
+            Is5taEntradaAlcista = false;
+            Is5taEntradaBajista = false;
+
+
+            if (!trProp.GuiaArriba && trProp.IsEma2Rising && trProp.IsEma15Rising && trProp.IsEma2OverEma15 & trProp.IsCambioDeGuia)
+            {
+                Is5taEntradaAlcista = true;
+
+            }
+
+            if (trProp.GuiaArriba && !trProp.IsEma2Rising && !trProp.IsEma15Rising && !trProp.IsEma2OverEma15 & trProp.IsCambioDeGuia)
+            {
+                Is5taEntradaBajista = true;
+
             }
         }
 
-		protected override void OnBarUpdate()
+        private void Processar5taEetrada()
+        {
+            string entradamessage = "";
+            if (Is5taEntradaAlcista || Is5taEntradaBajista)
+            {
+                if (Is5taEntradaAlcista)
+                {
+                    entradamessage = string.Format("{0}, 5ta Entrada Alcista", Time[0]);
+                    TRUtilities.SaveToFile(_Path, IsWriteToFile, entradamessage);
+                    PrintOutput(true, entradamessage);
+
+                    _ = Draw.Dot(this, @"SectorTR" + CurrentBar, true, 0, Lows[1][0], Brushes.CornflowerBlue);
+                    Draw.Text(this, "tag1" + CurrentBar, "5ta Entrada Alcista", 0, Convert.ToInt32(Lows[1][0]) - 10, ChartControl.Properties.ChartText);
+                }
+                else
+                {
+                    entradamessage = string.Format("{0}, 5ta Entrada Alcista", Time[0]);
+                    TRUtilities.SaveToFile(_Path, IsWriteToFile, entradamessage);
+                    PrintOutput(true, entradamessage);
+
+                    _ = Draw.Dot(this, @"SectorTR" + CurrentBar, true, 0, Highs[1][0], Brushes.CornflowerBlue);
+                    Draw.Text(this, "tag1" + CurrentBar, "5ta Entrada Bajista", 0, Convert.ToInt32(Highs[1][0]) + 10, ChartControl.Properties.ChartText);
+                }
+
+                string logEntry = string.Format("{0},{1},{2},{3},{4},{5},{6},{7},{8},{9},{10},{11},{12},{13},{14},{15},{16},{17},{18},{19},{20},{21},{22}", Time[0], BarsInProgress, Open[0], Close[0], High[0], Low[0], GuiaTR1[0], trProp.GuiaArriba, trProp.IsCambioDeGuia, atr[0], trProp.IsHighGTGuia, trProp.IsLowCrossGuia, trProp.IsFacturoGuia, trProp.IsFacturoLTGuia, sma[0], ema2[0], ema15[0], trProp.IsCloseGTSMA50Alcista, trProp.IsEma2Rising, trProp.IsEma15Rising, trProp.IsCloseGTEma2min, Is5taEntradaAlcista, Is5taEntradaBajista);
+                PrintOutput(IsVerboseLogs, entradamessage);
+                TRUtilities.SaveToFile(_Path, (IsWriteToFile && IsVerboseLogs), logEntry);
+            }
+        }
+        protected override void OnBarUpdate()
 		{
             if (BarsInProgress == 0 && CurrentBar == 1)
             {
@@ -125,87 +204,24 @@ namespace NinjaTrader.NinjaScript.Indicators
             if (!_initialized)
                 return;
 
-
-            PreviousGuiaArriba = GuiaArriba;
+            
+            trProp.PreviousGuiaArriba = trProp.GuiaArriba;
 
             //Calculate Guia
             if ( GuiaTR1[0] > Closes[1][0] )
             {
-                GuiaArriba = true;
+                trProp.GuiaArriba = true;
             }
             else if(GuiaTR1[0] < Closes[1][0])
             {
-                GuiaArriba = false;
+                trProp.GuiaArriba = false;
             }
 
-
-            bool IsHighGTGuia = GuiaTR1[0] < High[0];
-            bool IsLowCrossGuia = GuiaTR1[0] > Low[0];
-            bool IsFacturoGuia = Close[0] > GuiaTR1[0];
-            bool IsFacturoLTGuia = Close[0] < GuiaTR1[0];
-
-            bool IsCloseGTSMA50Alcista = (Close[0] > sma[0] && Open[0] < sma[0]) ? true : false;
-            bool IsCloseGTSMA50Bajista = (Close[0] < sma[0] && Open[0] > sma[0]) ? true : false;
-
-            bool IsEma2Rising = (ema2[0] > ema2[1]) ? true : false;
-            bool IsEma15Rising = (ema15[0] > ema15[1]) ? true : false;
-            bool IsCloseGTEma2min = (Close[0] > ema2[0]) ? true : false;
-
-            bool IsEma2OverEma15 = (ema2[0] > ema15[0]) ? true : false;
-
-             bool IsCambioDeGuia = (PreviousGuiaArriba != GuiaArriba) ? true : false;
-           // bool IsCambioDeGuia = false;
-
-            double changeofGuiaValue = Math.Abs(GuiaTR1[0] - GuiaTR1[1]);
-            if (changeofGuiaValue > atr[0] && GuiaArriba != PreviousGuiaArriba  )
-            {
-            //    IsCambioDeGuia = true;
-            }
-
-            bool Is5taEntradaAlcista = false;
-            bool Is5taEntradaBajista = false;
-
-
-            if (!GuiaArriba && IsEma2Rising && IsEma15Rising && IsEma2OverEma15 & IsCambioDeGuia)
-            {
-                Is5taEntradaAlcista = true;
-
-            }
-
-            if (GuiaArriba && !IsEma2Rising && !IsEma15Rising && !IsEma2OverEma15 & IsCambioDeGuia)
-            {
-                Is5taEntradaBajista = true;
-
-            }
+            Calculate5taEntradaSignals();
 
             if (BarsInProgress == 0)
             {
-                string entradamessage = "";
-                if (Is5taEntradaAlcista || Is5taEntradaBajista)
-                {
-                    if (Is5taEntradaAlcista)
-                    {
-                        entradamessage = string.Format("{0}, 5ta Entrada Alcista", Time[0]);
-                        TRUtilities.SaveToFile(_Path, IsWriteToFile, entradamessage);
-                        PrintOutput(true, entradamessage);
-
-                        _ = Draw.Dot(this, @"SectorTR" + CurrentBar, true, 0, Lows[1][0] , Brushes.CornflowerBlue);
-                        Draw.Text(this, "tag1" + CurrentBar, "5ta Entrada Alcista", 0, Convert.ToInt32(Lows[1][0]) - 10, ChartControl.Properties.ChartText);
-                    }
-                    else
-                    {
-                        entradamessage = string.Format("{0}, 5ta Entrada Alcista", Time[0]);
-                        TRUtilities.SaveToFile(_Path, IsWriteToFile, entradamessage);
-                        PrintOutput(true, entradamessage);
-
-                        _ = Draw.Dot(this, @"SectorTR" + CurrentBar, true, 0, Highs[1][0] , Brushes.CornflowerBlue);
-                        Draw.Text(this, "tag1" + CurrentBar, "5ta Entrada Bajista", 0, Convert.ToInt32(Highs[1][0]) + 10, ChartControl.Properties.ChartText);
-                    }
-
-                    string logEntry = string.Format("{0},{1},{2},{3},{4},{5},{6},{7},{8},{9},{10},{11},{12},{13},{14},{15},{16},{17},{18},{19},{20},{21},{22}", Time[0], BarsInProgress, Open[0], Close[0], High[0], Low[0], GuiaTR1[0], GuiaArriba, IsCambioDeGuia,atr[0], IsHighGTGuia, IsLowCrossGuia, IsFacturoGuia, IsFacturoLTGuia, sma[0], ema2[0], ema15[0], IsCloseGTSMA50Alcista, IsEma2Rising, IsEma15Rising, IsCloseGTEma2min, Is5taEntradaAlcista, Is5taEntradaBajista);
-                    PrintOutput(IsVerboseLogs, entradamessage);
-                    TRUtilities.SaveToFile(_Path, (IsWriteToFile && IsVerboseLogs), logEntry);
-                }
+                Processar5taEetrada();
             }
 
         }
@@ -219,6 +235,24 @@ namespace NinjaTrader.NinjaScript.Indicators
         [Display(Name = "IsVerboseLogs", Description = "Verbose log details", Order = 2, GroupName = "Parameters")]
         public bool IsVerboseLogs
         { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "IsPrintOutput", Description = "Print Entries in Output Window", Order = 3, GroupName = "Parameters")]
+        public bool IsPrintOutput
+        { get; set; }
+
+        [Browsable(false)]
+        [XmlIgnore()]
+        [NinjaScriptProperty]       
+        public bool Is5taEntradaAlcista
+        { get; set; }
+
+        [Browsable(false)]
+        [XmlIgnore()]
+        [NinjaScriptProperty]        
+        public bool Is5taEntradaBajista
+        { get; set; }
+
         #endregion
     }
 }
@@ -230,18 +264,18 @@ namespace NinjaTrader.NinjaScript.Indicators
 	public partial class Indicator : NinjaTrader.Gui.NinjaScript.IndicatorRenderBase
 	{
 		private TR5taEntradaSignal[] cacheTR5taEntradaSignal;
-		public TR5taEntradaSignal TR5taEntradaSignal(bool isWriteToFile, bool isVerboseLogs)
+		public TR5taEntradaSignal TR5taEntradaSignal(bool isWriteToFile, bool isVerboseLogs, bool isPrintOutput, bool is5taEntradaAlcista, bool is5taEntradaBajista)
 		{
-			return TR5taEntradaSignal(Input, isWriteToFile, isVerboseLogs);
+			return TR5taEntradaSignal(Input, isWriteToFile, isVerboseLogs, isPrintOutput, is5taEntradaAlcista, is5taEntradaBajista);
 		}
 
-		public TR5taEntradaSignal TR5taEntradaSignal(ISeries<double> input, bool isWriteToFile, bool isVerboseLogs)
+		public TR5taEntradaSignal TR5taEntradaSignal(ISeries<double> input, bool isWriteToFile, bool isVerboseLogs, bool isPrintOutput, bool is5taEntradaAlcista, bool is5taEntradaBajista)
 		{
 			if (cacheTR5taEntradaSignal != null)
 				for (int idx = 0; idx < cacheTR5taEntradaSignal.Length; idx++)
-					if (cacheTR5taEntradaSignal[idx] != null && cacheTR5taEntradaSignal[idx].IsWriteToFile == isWriteToFile && cacheTR5taEntradaSignal[idx].IsVerboseLogs == isVerboseLogs && cacheTR5taEntradaSignal[idx].EqualsInput(input))
+					if (cacheTR5taEntradaSignal[idx] != null && cacheTR5taEntradaSignal[idx].IsWriteToFile == isWriteToFile && cacheTR5taEntradaSignal[idx].IsVerboseLogs == isVerboseLogs && cacheTR5taEntradaSignal[idx].IsPrintOutput == isPrintOutput && cacheTR5taEntradaSignal[idx].Is5taEntradaAlcista == is5taEntradaAlcista && cacheTR5taEntradaSignal[idx].Is5taEntradaBajista == is5taEntradaBajista && cacheTR5taEntradaSignal[idx].EqualsInput(input))
 						return cacheTR5taEntradaSignal[idx];
-			return CacheIndicator<TR5taEntradaSignal>(new TR5taEntradaSignal(){ IsWriteToFile = isWriteToFile, IsVerboseLogs = isVerboseLogs }, input, ref cacheTR5taEntradaSignal);
+			return CacheIndicator<TR5taEntradaSignal>(new TR5taEntradaSignal(){ IsWriteToFile = isWriteToFile, IsVerboseLogs = isVerboseLogs, IsPrintOutput = isPrintOutput, Is5taEntradaAlcista = is5taEntradaAlcista, Is5taEntradaBajista = is5taEntradaBajista }, input, ref cacheTR5taEntradaSignal);
 		}
 	}
 }
@@ -250,14 +284,14 @@ namespace NinjaTrader.NinjaScript.MarketAnalyzerColumns
 {
 	public partial class MarketAnalyzerColumn : MarketAnalyzerColumnBase
 	{
-		public Indicators.TR5taEntradaSignal TR5taEntradaSignal(bool isWriteToFile, bool isVerboseLogs)
+		public Indicators.TR5taEntradaSignal TR5taEntradaSignal(bool isWriteToFile, bool isVerboseLogs, bool isPrintOutput, bool is5taEntradaAlcista, bool is5taEntradaBajista)
 		{
-			return indicator.TR5taEntradaSignal(Input, isWriteToFile, isVerboseLogs);
+			return indicator.TR5taEntradaSignal(Input, isWriteToFile, isVerboseLogs, isPrintOutput, is5taEntradaAlcista, is5taEntradaBajista);
 		}
 
-		public Indicators.TR5taEntradaSignal TR5taEntradaSignal(ISeries<double> input , bool isWriteToFile, bool isVerboseLogs)
+		public Indicators.TR5taEntradaSignal TR5taEntradaSignal(ISeries<double> input , bool isWriteToFile, bool isVerboseLogs, bool isPrintOutput, bool is5taEntradaAlcista, bool is5taEntradaBajista)
 		{
-			return indicator.TR5taEntradaSignal(input, isWriteToFile, isVerboseLogs);
+			return indicator.TR5taEntradaSignal(input, isWriteToFile, isVerboseLogs, isPrintOutput, is5taEntradaAlcista, is5taEntradaBajista);
 		}
 	}
 }
@@ -266,14 +300,14 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
 	public partial class Strategy : NinjaTrader.Gui.NinjaScript.StrategyRenderBase
 	{
-		public Indicators.TR5taEntradaSignal TR5taEntradaSignal(bool isWriteToFile, bool isVerboseLogs)
+		public Indicators.TR5taEntradaSignal TR5taEntradaSignal(bool isWriteToFile, bool isVerboseLogs, bool isPrintOutput, bool is5taEntradaAlcista, bool is5taEntradaBajista)
 		{
-			return indicator.TR5taEntradaSignal(Input, isWriteToFile, isVerboseLogs);
+			return indicator.TR5taEntradaSignal(Input, isWriteToFile, isVerboseLogs, isPrintOutput, is5taEntradaAlcista, is5taEntradaBajista);
 		}
 
-		public Indicators.TR5taEntradaSignal TR5taEntradaSignal(ISeries<double> input , bool isWriteToFile, bool isVerboseLogs)
+		public Indicators.TR5taEntradaSignal TR5taEntradaSignal(ISeries<double> input , bool isWriteToFile, bool isVerboseLogs, bool isPrintOutput, bool is5taEntradaAlcista, bool is5taEntradaBajista)
 		{
-			return indicator.TR5taEntradaSignal(input, isWriteToFile, isVerboseLogs);
+			return indicator.TR5taEntradaSignal(input, isWriteToFile, isVerboseLogs, isPrintOutput, is5taEntradaAlcista, is5taEntradaBajista);
 		}
 	}
 }
