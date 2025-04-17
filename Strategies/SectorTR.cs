@@ -44,6 +44,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private double TriggerPrice;
         private int TriggerState;
 
+        private BreakEvenExitStrategy _breakEvenExit;
 
         //private double _StopPrice;
         //private double _TriggerPrice;
@@ -72,13 +73,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // Disable this property for performance gains in Strategy Analyzer optimizations
                 // See the Help Guide for additional information
                 IsInstantiatedOnEachOptimizationIteration = true;
-
-                BreakEvenTrigger = 5;
-                InitialStopDistance = -10;
+                
                 StopPrice = 0;
                 TriggerPrice = 0;
                 TriggerState = 0;
-
 
             }
             else if (State == State.Configure)
@@ -95,6 +93,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 ema2 = EMA(BarsArray[0], 20);
                 ema15 = EMA(BarsArray[2], 20);
                 GuiaTR1 = GuiaTR(Closes[1], 5, 2.1);
+
+                _breakEvenExit = new BreakEvenExitStrategy(this);
             }
         }
 
@@ -176,12 +176,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                     Draw.Dot(this, @"SectorTR" + CurrentBar, true, 0, Low[0] - 1, Brushes.CornflowerBlue);
                     Draw.Text(this, "tag1" + CurrentBar, "Sector Alcista", 0, Convert.ToInt32(Low[0]) - 10, ChartControl.Properties.ChartText);
 
-                    StopPrice = Low[0];
-                    TriggerPrice = ema15[0];
+                    _breakEvenExit.SetStopPrice(Low[0]);
+                    _breakEvenExit.SetTriggerPrice(ema15[0]);
 
                     if (Position.MarketPosition == MarketPosition.Flat)
                     {
-                        TriggerState = 1;
+                        _breakEvenExit.SetTriggerState(1);
                         PrintOutput("Entering Long");
                         EnterLong(Convert.ToInt32(DefaultQuantity), @"entry");
                     }
@@ -207,56 +207,11 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private void PrintOutput(string text)
         {
-
             Print(string.Format("{0},{1},{2},{3}", Time[0], text, TriggerPrice, StopPrice));
-
         }
         private void BreakEvenExtiStrategy()
         {
-
-
-            // Set 1
-            if ((TriggerState >= 2)
-                 && (Position.MarketPosition == MarketPosition.Flat))
-            {
-                TriggerState = 0;
-            }
-
-            // Set 3
-            if ((TriggerState == 1)
-                 && (Position.MarketPosition == MarketPosition.Long))
-            {
-                TriggerState = 2;
-
-                // StopPrice = Low[0] - 1;
-
-                //PrintOutput("Long Updating Stop and Target");
-            }
-
-            // Set 4
-            if ((TriggerState == 2)
-                 && (Close[0] >= TriggerPrice))
-            {
-                TriggerState = 3;
-
-                StopPrice = Low[0];
-
-                // PrintOutput("Resetting Stop");
-                Draw.Diamond(this, @"BreakEvenBuilderExample Diamond_1", true, 0, (High[0] + (2 * TickSize)), Brushes.DarkCyan);
-            }
-
-            // Set 5
-            if (TriggerState >= 2)
-            {
-                if (TriggerState == 3)
-                {
-                    StopPrice = Low[0];
-                }
-
-                //  PrintOutput("Updating the Stop Exit");
-                ExitLongStopMarket(Convert.ToInt32(DefaultQuantity), StopPrice, @"exit", @"entry");
-            }
-
+            _breakEvenExit.Process();
         }
         private void PrintOutput(bool Verbose, string text)
         {
@@ -265,19 +220,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Print(text);
             }
         }
-
-        #region Properties
-        [NinjaScriptProperty]
-        [Range(1, int.MaxValue)]
-        [Display(Name = "BreakEvenTrigger", Description = "Number of ticks above entry the breakeven movement trigger is set", Order = 1, GroupName = "Parameters")]
-        public int BreakEvenTrigger
-        { get; set; }
-
-        [NinjaScriptProperty]
-        [Range(-999, int.MaxValue)]
-        [Display(Name = "InitialStopDistance", Description = "(use a negative) Number of ticks from entry the stop will initially be placed below", Order = 2, GroupName = "Parameters")]
-        public int InitialStopDistance
-        { get; set; }
-        #endregion
+       
     }
 }
