@@ -1,6 +1,18 @@
 using NinjaTrader.NinjaScript.Strategies;
 using System;
 using System.Windows.Media;
+using NinjaTrader.Cbi;
+using NinjaTrader.NinjaScript.DrawingTools;
+using NinjaTrader.Gui;
+using NinjaTrader.Gui.Chart;
+using NinjaTrader.Gui.SuperDom;
+using NinjaTrader.Gui.Tools;
+using NinjaTrader.Data;
+using NinjaTrader.NinjaScript;
+using NinjaTrader.Core.FloatingPoint;
+using NinjaTrader.NinjaScript.Indicators;
+
+using NinjaTrader.NinjaScript.Utilities;
 
 public class BreakEvenExitStrategy
 {
@@ -8,63 +20,64 @@ public class BreakEvenExitStrategy
     private int _triggerState;
     private double _stopPrice;
     private double _triggerPrice;
+    private bool _IsVerbose = false;
 
+    public double StopPrice { get => _stopPrice; set => _stopPrice = value; }
+    public double TriggerPrice { get => _triggerPrice; set => _triggerPrice = value; }
+    public int TriggerState { get => _triggerState; set => _triggerState = value; }
+    public bool IsVerbose { get => _IsVerbose; set => _IsVerbose = value; }
+
+    private void PrintOutput(string text)
+    {
+        if (IsVerbose)
+        { 
+        _strategy.Print(string.Format("{0},{1},{2},{3},{4}", _strategy.Time[0], text, TriggerState, TriggerPrice, StopPrice));
+        }
+
+    }
     public BreakEvenExitStrategy(Strategy strategy)
     {
         _strategy = strategy;
-        _triggerState = 0;
-        _stopPrice = 0;
-        _triggerPrice = 0;
-    }
-
-    public void SetTriggerPrice(double price)
-    {
-        _triggerPrice = price;
-    }
-
-    public void SetStopPrice(double price)
-    {
-        _stopPrice = price;
-    }
-
+        TriggerState = 0;
+        StopPrice = 0;
+        TriggerPrice = 0;
+    }    
     public void Process()
     {
         // Set 1 - Reset state when flat
-        if ((_triggerState >= 2) && (_strategy.Position.MarketPosition == MarketPosition.Flat))
+        if ((TriggerState >= 2) && (_strategy.Position.MarketPosition == MarketPosition.Flat))
         {
-            _triggerState = 0;
+            TriggerState = 0;
         }
 
         // Set 3 - Initialize when entering long position
-        if ((_triggerState == 1) && (_strategy.Position.MarketPosition == MarketPosition.Long))
+        if ((TriggerState == 1) && (_strategy.Position.MarketPosition == MarketPosition.Long))
         {
-            _triggerState = 2;
+            TriggerState = 2;
+            PrintOutput("Long position entered");
         }
 
         // Set 4 - Move to break-even when price reaches trigger
-        if ((_triggerState == 2) && (_strategy.Close[0] >= _triggerPrice))
+        if ((TriggerState == 2) && (_strategy.Close[0] >= TriggerPrice))
         {
-            _triggerState = 3;
-            _stopPrice = _strategy.Low[0];
-            _strategy.Draw.Diamond(_strategy, @"BreakEvenBuilderExample Diamond_1", true, 0, 
-                (_strategy.High[0] + (2 * _strategy.TickSize)), Brushes.DarkCyan);
+            TriggerState = 3;
+            StopPrice = TriggerPrice > _strategy.Low[0] ? TriggerPrice : _strategy.Low[0];
+            PrintOutput("Close > Trigger Price");
+            //_strategy.Draw.Diamond(_strategy, @"BreakEvenBuilderExample Diamond_1", true, 0, (_strategy.High[0] + (2 * _strategy.TickSize)), Brushes.DarkCyan);
         }
 
         // Set 5 - Update trailing stop
-        if (_triggerState >= 2)
+        if (TriggerState >= 2)
         {
-            if (_triggerState == 3)
+            if (TriggerState == 3)
             {
-                _stopPrice = _strategy.Low[0];
+                PrintOutput("Updating trailing stop");
+                StopPrice = _strategy.Low[0];
             }
 
             _strategy.ExitLongStopMarket(Convert.ToInt32(_strategy.DefaultQuantity), 
-                _stopPrice, @"exit", @"entry");
+                StopPrice, @"exit", @"entry");
         }
     }
 
-    public void SetTriggerState(int state)
-    {
-        _triggerState = state;
-    }
 }
