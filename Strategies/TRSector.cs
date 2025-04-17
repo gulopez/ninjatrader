@@ -72,7 +72,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 BarsRequiredToTrade = 20;
                 // Disable this property for performance gains in Strategy Analyzer optimizations
                 // See the Help Guide for additional information
-                IsInstantiatedOnEachOptimizationIteration = true;
+                IsInstantiatedOnEachOptimizationIteration = false;
 
                 StopPrice = 0;
                 TriggerPrice = 0;
@@ -97,7 +97,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 GuiaTR1 = GuiaTR(Closes[1], 5, 2.1);
 
                 _breakEvenExit = new BreakEvenExitStrategy(this);
-                _breakEvenExit.IsVerbose = false;
+                _breakEvenExit.IsVerbose = true;
             }
         }
 
@@ -143,8 +143,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             trProp.IsCloseGTSMA50Alcista = (Close[0] > sma[0] && Open[0] < sma[0]) ? true : false;
             trProp.IsCloseGTSMA50Bajista = (Close[0] < sma[0] && Open[0] > sma[0]) ? true : false;
 
-            trProp.IsEma2Rising = (ema2[0] > ema2[1]) ? true : false;
-            trProp.IsEma15Rising = (ema15[0] > ema15[1]) ? true : false;
+            trProp.IsEma2Rising = (ema2[0] > ema2[1] && ema2[1] > ema2[2]) ? true : false;
+            trProp.IsEma15Rising = (ema15[0] > ema15[1] && ema15[1] > ema15[2]) ? true : false;
             trProp.IsEma2OverEma15 = (ema2[0] > ema15[0]) ? true : false;
 
             trProp.IsCloseGTEma2min = (Close[0] > ema2[0]) ? true : false;
@@ -172,18 +172,18 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     entradamessage = string.Format("{0}, Sector Alcista", Time[0]);
                     //  TRUtilities.SaveToFile(_Path, IsWriteToFile, entradamessage);
-                   // PrintOutput(IsVerbose, entradamessage);
+                    // PrintOutput(IsVerbose, entradamessage);
 
-                    Draw.Dot(this, @"SectorTR" + CurrentBar, true, 0, Low[0] - 1, Brushes.CornflowerBlue);
-                    Draw.Text(this, "tag1" + CurrentBar, "Sector Alcista", 0, Convert.ToInt32(Low[0]) - 10, ChartControl.Properties.ChartText);
+                    // Draw.Dot(this, @"SectorTR" + CurrentBar, true, 0, Low[0] - 1, Brushes.CornflowerBlue);
+                    //  Draw.Text(this, "tag1" + CurrentBar, "Sector Alcista", 0, Convert.ToInt32(Low[0]) - 10, ChartControl.Properties.ChartText);
 
-                    _breakEvenExit.StopPrice =Low[0];
-                    _breakEvenExit.TriggerPrice =ema15[0];
+                    _breakEvenExit.StopPrice = Low[0];
+                    _breakEvenExit.TriggerPrice = ema15[0];
 
                     if (Position.MarketPosition == MarketPosition.Flat)
                     {
-                        _breakEvenExit.TriggerState=1;
-                        PrintOutput(false,"Entering Long");
+                        _breakEvenExit.TriggerState = 1;
+                        PrintOutput(true, "Entering Long");
                         EnterLong(Convert.ToInt32(DefaultQuantity), @"entry");
                     }
                 }
@@ -205,7 +205,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // TRUtilities.SaveToFile(_Path, (IsWriteToFile && IsVerboseLogs), logEntry);
             }
         }
-        
+
         private void BreakEvenExtiStrategy()
         {
             _breakEvenExit.Process();

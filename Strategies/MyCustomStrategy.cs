@@ -65,8 +65,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 				GuiaTR1				= GuiaTR(Close, 5, 2.1);                
                 GuiaTR1.Plots[0].Brush = Brushes.White;
 				atr = ATR(5);
+                changeTR = ChangeTR(Closes[1], 5, 2.1);
 
-				
+
 
                 AddChartIndicator(GuiaTR1);
 			}

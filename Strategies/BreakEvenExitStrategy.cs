@@ -30,8 +30,8 @@ public class BreakEvenExitStrategy
     private void PrintOutput(string text)
     {
         if (IsVerbose)
-        { 
-        _strategy.Print(string.Format("{0},{1},{2},{3},{4}", _strategy.Time[0], text, TriggerState, TriggerPrice, StopPrice));
+        {
+            _strategy.Print(string.Format("{0},{1},{2},{3},{4}", _strategy.Time[0], text, TriggerState, TriggerPrice, StopPrice));
         }
 
     }
@@ -41,7 +41,7 @@ public class BreakEvenExitStrategy
         TriggerState = 0;
         StopPrice = 0;
         TriggerPrice = 0;
-    }    
+    }
     public void Process()
     {
         // Set 1 - Reset state when flat
@@ -75,8 +75,19 @@ public class BreakEvenExitStrategy
                 StopPrice = _strategy.Low[0];
             }
 
-            _strategy.ExitLongStopMarket(Convert.ToInt32(_strategy.DefaultQuantity), 
-                StopPrice, @"exit", @"entry");
+            if (_strategy.Close[0] < StopPrice)
+            {
+                //Exit right away
+                PrintOutput("Exiting strong reversal");
+                _strategy.ExitLong(@"entry");
+            }
+            else
+            {
+                _strategy.ExitLongStopMarket(Convert.ToInt32(_strategy.DefaultQuantity),
+                   StopPrice, @"exit", @"entry");
+
+            }
+
         }
     }
 
