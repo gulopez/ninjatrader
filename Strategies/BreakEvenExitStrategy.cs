@@ -71,14 +71,14 @@ public class BreakEvenExitStrategy
         {
             if (TriggerState == 3)
             {
-                PrintOutput("Updating trailing stop");
+                PrintOutput("Updating trailing stop Long");
                 StopPrice = _strategy.Low[0];
             }
 
             if (_strategy.Close[0] < StopPrice)
             {
                 //Exit right away
-                PrintOutput("Exiting strong reversal");
+                PrintOutput("Exiting strong reversal Long");
                 _strategy.ExitLong(@"entry");
             }
             else
@@ -89,6 +89,54 @@ public class BreakEvenExitStrategy
             }
 
         }
+
+        ///////////////////////////Short
+        // Set 1 - Reset state when flat
+        if ((TriggerState <= -2) && (_strategy.Position.MarketPosition == MarketPosition.Flat))
+        {
+            TriggerState = 0;
+        }
+
+        // Set 3 - Initialize when entering long position
+        if ((TriggerState == -1) && (_strategy.Position.MarketPosition == MarketPosition.Short))
+        {
+            TriggerState = -2;
+            PrintOutput("Short position entered");
+        }
+
+        // Set 4 - Move to break-even when price reaches trigger
+        if ((TriggerState == -2) && (_strategy.Close[0] <= TriggerPrice))
+        {
+            TriggerState = -3;
+            StopPrice = TriggerPrice < _strategy.High[0] ? TriggerPrice : _strategy.High[0];
+            PrintOutput("Close < Trigger Price");
+            //_strategy.Draw.Diamond(_strategy, @"BreakEvenBuilderExample Diamond_1", true, 0, (_strategy.High[0] + (2 * _strategy.TickSize)), Brushes.DarkCyan);
+        }
+
+        // Set 5 - Update trailing stop
+        if (TriggerState <= -2)
+        {
+            if (TriggerState == -3)
+            {
+                PrintOutput("Updating trailing stop for Shorts");
+                StopPrice = _strategy.High[0];
+            }
+
+            if (_strategy.Close[0] > StopPrice)
+            {
+                //Exit right away
+                PrintOutput("Exiting strong reversal Short");
+                _strategy.ExitShort(@"entryshort");
+            }
+            else
+            {
+                _strategy.ExitShortStopMarket(Convert.ToInt32(_strategy.DefaultQuantity),
+                   StopPrice, @"exit", @"entryshort");
+
+            }
+
+        }
+
     }
 
 }

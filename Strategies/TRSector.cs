@@ -47,6 +47,9 @@ namespace NinjaTrader.NinjaScript.Strategies
         private BreakEvenExitStrategy _breakEvenExit;
         private bool _IsVerbose = false;
 
+        private double _ema15PriceTarget = 0;
+        private double _targetEscalonado = 10;
+        private double _targetSteps = 10;
         public bool IsVerbose { get => _IsVerbose; set => _IsVerbose = value; }
 
         protected override void OnStateChange()
@@ -167,6 +170,8 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             if (trProp.IsSectorAlcista == true || trProp.IsSectorBajista == true)
             {
+                double riesgo = 0;
+                double profitPotential = 0;
                 string entradamessage = "";
                 if (trProp.IsSectorAlcista == true)
                 {
@@ -178,13 +183,35 @@ namespace NinjaTrader.NinjaScript.Strategies
                     //  Draw.Text(this, "tag1" + CurrentBar, "Sector Alcista", 0, Convert.ToInt32(Low[0]) - 10, ChartControl.Properties.ChartText);
 
                     _breakEvenExit.StopPrice = Low[0];
-                    _breakEvenExit.TriggerPrice = ema15[0];
+                    _ema15PriceTarget = ema15[0];
+                    //double firsttarget = Close[0] + _targetEscalonado;
+
+                    //if(firsttarget > _ema15PriceTarget)
+                    //{
+                    //    _breakEvenExit.TriggerPrice = firsttarget;
+                    //}
+                    //else
+                    //{
+                    _breakEvenExit.TriggerPrice = _ema15PriceTarget;
+                    //}
 
                     if (Position.MarketPosition == MarketPosition.Flat)
                     {
-                        _breakEvenExit.TriggerState = 1;
-                        PrintOutput(true, "Entering Long");
-                        EnterLong(Convert.ToInt32(DefaultQuantity), @"entry");
+                        riesgo = Close[0] - _breakEvenExit.StopPrice;
+                        profitPotential = _breakEvenExit.TriggerPrice - Close[0];
+
+                        if (profitPotential > riesgo)
+                        {
+                            _breakEvenExit.TriggerState = 1;
+                            PrintOutput(true, "Entering Long");
+                            EnterLong(Convert.ToInt32(DefaultQuantity), @"entry");
+
+                            //ExitLongStopMarket(Convert.ToInt32(DefaultQuantity), _breakEvenExit.StopPrice, @"exit", @"entry");
+                        }
+                        else
+                        {
+                            PrintOutput(true, "Skipping Long opportunity Risk is not worth the target");
+                        }
                     }
                 }
                 else
@@ -196,8 +223,25 @@ namespace NinjaTrader.NinjaScript.Strategies
                     //Draw.Dot(this, @"SectorTR" + CurrentBar, true, 0, High[0] + 1, Brushes.CornflowerBlue);
                     //Draw.Text(this, "tag1" + CurrentBar, "Sector Bajista", 0, Convert.ToInt32(High[0]) + 10, ChartControl.Properties.ChartText);
 
-                    //_StopPrice = High[0] + 1;
-                    //_TriggerPrice = ema15[0];
+                    _breakEvenExit.StopPrice = High[0];
+                    _breakEvenExit.TriggerPrice = ema15[0];
+
+                    if (Position.MarketPosition == MarketPosition.Flat)
+                    {
+                        riesgo = _breakEvenExit.StopPrice - Close[0];
+                        profitPotential = Close[0] - _breakEvenExit.TriggerPrice;
+
+                        if (profitPotential > riesgo)
+                        {
+                            _breakEvenExit.TriggerState = -1;
+                            PrintOutput(true, "Entering Short");
+                            EnterShort(Convert.ToInt32(DefaultQuantity), @"entryshort");
+                        }
+                        else
+                        {
+                            PrintOutput(true, "Skipping Short opportunity Risk is not worth the target");
+                        }
+                    }
 
                 }
 
