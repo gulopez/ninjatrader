@@ -20,20 +20,39 @@ public class BreakEvenExitStrategy
     private int _triggerState;
     private double _stopPrice;
     private double _triggerPrice;
-    private bool _IsVerbose = false;
 
+    private string _headerText = "Time, Message, TriggerState, TriggerPrice, StopPrice";
+    private string _bodyText = "{0},{1},{2},{3},{4}";
+
+    private string _path;
+
+    public bool IsPrintOutput { get; set; }
+    public bool IsWriteToFile { get; set; }
     public double StopPrice { get => _stopPrice; set => _stopPrice = value; }
     public double TriggerPrice { get => _triggerPrice; set => _triggerPrice = value; }
     public int TriggerState { get => _triggerState; set => _triggerState = value; }
-    public bool IsVerbose { get => _IsVerbose; set => _IsVerbose = value; }
+
+    public string Path { get => _path; set => _path = value; }
+    public string HeaderText { get => _headerText; set => _headerText = value; }
 
     private void PrintOutput(string text)
     {
-        if (IsVerbose)
+        string output = string.Format(_bodyText, _strategy.Time[0], text, TriggerState, TriggerPrice, StopPrice);
+
+        if (IsPrintOutput)
         {
-            _strategy.Print(string.Format("{0},{1},{2},{3},{4}", _strategy.Time[0], text, TriggerState, TriggerPrice, StopPrice));
+            _strategy.Print(output);
         }
 
+        Write2File(output);
+    }
+
+    private void Write2File(string text)
+    {
+        if (IsWriteToFile)
+        {
+            TRUtilities.SaveToFile(_path, IsWriteToFile, text);
+        }
     }
     public BreakEvenExitStrategy(Strategy strategy)
     {
@@ -85,9 +104,7 @@ public class BreakEvenExitStrategy
             {
                 _strategy.ExitLongStopMarket(Convert.ToInt32(_strategy.DefaultQuantity),
                    StopPrice, @"exit", @"entry");
-
             }
-
         }
 
         ///////////////////////////Short

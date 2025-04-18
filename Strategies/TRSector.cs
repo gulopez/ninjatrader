@@ -21,6 +21,7 @@ using NinjaTrader.Core.FloatingPoint;
 using NinjaTrader.NinjaScript.Indicators;
 using NinjaTrader.NinjaScript.DrawingTools;
 using NinjaTrader.NinjaScript.Utilities;
+using NinjaTrader.Code;
 #endregion
 
 //This namespace holds Strategies in this folder and is required. Do not change it. 
@@ -30,6 +31,13 @@ namespace NinjaTrader.NinjaScript.Strategies
     {
 
         private bool _initialized = false;
+        private string _path;
+
+        private string HeaderText = "Time,Message,TriggerPrice,StopPrice";
+        private string BodyText = "{0},{1},{2},{3}";
+
+        private string FileNamePrefix = "TR-Sector-Strat-";
+        private string FileName = "";
 
         private DireccionTR DireccionTR2Min;
         private DireccionTR DireccionTR12Min;
@@ -45,12 +53,11 @@ namespace NinjaTrader.NinjaScript.Strategies
         private int TriggerState;
 
         private BreakEvenExitStrategy _breakEvenExit;
-        private bool _IsVerbose = false;
 
         private double _ema15PriceTarget = 0;
         private double _targetEscalonado = 10;
         private double _targetSteps = 10;
-        public bool IsVerbose { get => _IsVerbose; set => _IsVerbose = value; }
+
 
         protected override void OnStateChange()
         {
@@ -80,8 +87,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 StopPrice = 0;
                 TriggerPrice = 0;
                 TriggerState = 0;
+                IsPrintOutput = false;
                 IsVerbose = false;
-
+                IsWriteToFile = false;
 
             }
             else if (State == State.Configure)
@@ -100,12 +108,39 @@ namespace NinjaTrader.NinjaScript.Strategies
                 GuiaTR1 = GuiaTR(Closes[1], 5, 2.1);
 
                 _breakEvenExit = new BreakEvenExitStrategy(this);
-                _breakEvenExit.IsVerbose = true;
+
+                if (IsVerbose)
+                {
+                    _breakEvenExit.IsPrintOutput = IsPrintOutput;
+                }
+
+                _breakEvenExit.IsWriteToFile = IsWriteToFile;
             }
         }
 
         protected override void OnBarUpdate()
         {
+            if (BarsInProgress == 0 && CurrentBar == 1)
+            {
+                if (IsWriteToFile)
+                {
+                    string uniqueIdentifier = DateTime.Now.Ticks.ToString();
+                    FileName = FileNamePrefix + uniqueIdentifier + ".csv";
+                    _path = NinjaTrader.Core.Globals.UserDataDir + FileName; // Define the Path to our test file
+                    TRUtilities.SaveToFile(_path, IsWriteToFile, HeaderText);
+
+                    string fileNameExit = FileNamePrefix + uniqueIdentifier + "-Exit.csv";
+                    _breakEvenExit.Path = NinjaTrader.Core.Globals.UserDataDir + fileNameExit;
+                    TRUtilities.SaveToFile(_breakEvenExit.Path, IsWriteToFile, _breakEvenExit.HeaderText);
+
+                }
+
+                if (IsPrintOutput)
+                {
+                    Print(HeaderText);
+                }
+            }
+
             //Make sure Daily bars are greater than BarsRequiredToTrade
             if (BarsInProgress == 2 && CurrentBar > BarsRequiredToTrade)
                 _initialized = true;
@@ -113,13 +148,11 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (!_initialized)
                 return;
 
-
             CalculateSectorSignals();
 
             if (BarsInProgress == 0)
             {
                 ProcessSectorSignals();
-
                 BreakEvenExtiStrategy();
             }
         }
@@ -175,25 +208,16 @@ namespace NinjaTrader.NinjaScript.Strategies
                 string entradamessage = "";
                 if (trProp.IsSectorAlcista == true)
                 {
-                    entradamessage = string.Format("{0}, Sector Alcista", Time[0]);
-                    //  TRUtilities.SaveToFile(_Path, IsWriteToFile, entradamessage);
-                    // PrintOutput(IsVerbose, entradamessage);
+                    entradamessage = "Sector Alcista";
+
+                    PrintOutput(entradamessage);
 
                     // Draw.Dot(this, @"SectorTR" + CurrentBar, true, 0, Low[0] - 1, Brushes.CornflowerBlue);
                     //  Draw.Text(this, "tag1" + CurrentBar, "Sector Alcista", 0, Convert.ToInt32(Low[0]) - 10, ChartControl.Properties.ChartText);
 
                     _breakEvenExit.StopPrice = Low[0];
                     _ema15PriceTarget = ema15[0];
-                    //double firsttarget = Close[0] + _targetEscalonado;
-
-                    //if(firsttarget > _ema15PriceTarget)
-                    //{
-                    //    _breakEvenExit.TriggerPrice = firsttarget;
-                    //}
-                    //else
-                    //{
                     _breakEvenExit.TriggerPrice = _ema15PriceTarget;
-                    //}
 
                     if (Position.MarketPosition == MarketPosition.Flat)
                     {
@@ -203,22 +227,20 @@ namespace NinjaTrader.NinjaScript.Strategies
                         if (profitPotential > riesgo)
                         {
                             _breakEvenExit.TriggerState = 1;
-                            PrintOutput(true, "Entering Long");
+                            PrintOutput("Entering Long");
                             EnterLong(Convert.ToInt32(DefaultQuantity), @"entry");
-
-                            //ExitLongStopMarket(Convert.ToInt32(DefaultQuantity), _breakEvenExit.StopPrice, @"exit", @"entry");
                         }
                         else
                         {
-                            PrintOutput(true, "Skipping Long opportunity Risk is not worth the target");
+                            PrintOutput("Skipping Long opportunity Risk is not worth the target");
                         }
                     }
                 }
                 else
                 {
-                    //entradamessage = string.Format("{0}, Sector Bajista", Time[0]);
-                    //  TRUtilities.SaveToFile(_Path, IsWriteToFile, entradamessage);
-                    //PrintOutput(true, entradamessage);
+                    entradamessage = "Sector Bajista";
+
+                    PrintOutput(entradamessage);
 
                     //Draw.Dot(this, @"SectorTR" + CurrentBar, true, 0, High[0] + 1, Brushes.CornflowerBlue);
                     //Draw.Text(this, "tag1" + CurrentBar, "Sector Bajista", 0, Convert.ToInt32(High[0]) + 10, ChartControl.Properties.ChartText);
@@ -234,15 +256,14 @@ namespace NinjaTrader.NinjaScript.Strategies
                         if (profitPotential > riesgo)
                         {
                             _breakEvenExit.TriggerState = -1;
-                            PrintOutput(true, "Entering Short");
+                            PrintOutput("Entering Short");
                             EnterShort(Convert.ToInt32(DefaultQuantity), @"entryshort");
                         }
                         else
                         {
-                            PrintOutput(true, "Skipping Short opportunity Risk is not worth the target");
+                            PrintOutput("Skipping Short opportunity Risk is not worth the target");
                         }
                     }
-
                 }
 
                 //string logEntry = string.Format(BodyText, Time[0], BarsInProgress, Open[0], Close[0], High[0], Low[0], GuiaTR1[0], trProp.GuiaArriba, trProp.IsHighGTGuia, trProp.IsLowCrossGuia, trProp.IsFacturoGuia, trProp.IsFacturoLTGuia, sma[0], ema2[0], ema15[0], trProp.IsCloseGTSMA50Alcista, trProp.IsEma2Rising, trProp.IsEma15Rising, trProp.IsCloseGTEma2min, trProp.IsSectorAlcista, trProp.IsSectorBajista);
@@ -254,13 +275,42 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             _breakEvenExit.Process();
         }
-        private void PrintOutput(bool Verbose, string text)
+        private void PrintOutput(string text)
         {
-            if (Verbose)
+            string output = string.Format(BodyText, Time[0], text, _breakEvenExit.TriggerPrice, _breakEvenExit.StopPrice);
+            if (IsPrintOutput)
             {
-                Print(string.Format("{0},{1},{2},{3}", Time[0], text, _breakEvenExit.TriggerPrice, _breakEvenExit.StopPrice));
+                Print(output);
+            }
+
+            Write2File(output);
+        }
+        private void Write2File(string text)
+        {
+            if (IsWriteToFile)
+            {
+                TRUtilities.SaveToFile(_path, IsWriteToFile, text);
             }
         }
+
+        #region Properties
+        [NinjaScriptProperty]
+        [Display(Name = "IsWriteToFile", Description = "Log entries to a file", Order = 1, GroupName = "Parameters")]
+        public bool IsWriteToFile
+        { get; set; }
+
+
+        [NinjaScriptProperty]
+        [Display(Name = "IsVerbose", Description = "Print Details for debugging", Order = 2, GroupName = "Parameters")]
+        public bool IsVerbose { get; set; }
+
+
+        [NinjaScriptProperty]
+        [Display(Name = "IsPrintOutput", Description = "Print Entries in Output Window", Order = 3, GroupName = "Parameters")]
+        public bool IsPrintOutput
+        { get; set; }
+
+        #endregion
 
     }
 }
